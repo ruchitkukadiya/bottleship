@@ -399,10 +399,10 @@ export default function BottleshipApp() {
   // This hook ensures that if the AI hits 4 bottles, the game ends immediately.
   useEffect(() => {
     if (mode === 'ai' && !winner) {
-       const hits = opponentGrid.filter(c => c === 'hit').length;
-       if (hits >= 4) {
-           finishGame('opponent');
-       }
+      const hits = opponentGrid.filter(c => c === 'hit').length;
+      if (hits >= 4) {
+        finishGame('opponent');
+      }
     }
   }, [opponentGrid, mode, winner]);
 
@@ -411,7 +411,7 @@ export default function BottleshipApp() {
     if (mode !== 'online' || !roomCode || !user) return;
 
     const gameRef = doc(db, 'artifacts', appId, 'public', 'data', 'bottleship', roomCode);
-    
+
     const unsub = onSnapshot(gameRef, (snapshot) => {
       if (!snapshot.exists()) {
         if (!isHost) alert("Room destroyed or invalid");
@@ -430,28 +430,28 @@ export default function BottleshipApp() {
       const oppBottles = amIHost ? data.guestBottles : data.hostBottles;
       const myMoves = amIHost ? data.hostMoves : data.guestMoves;
       const oppMoves = amIHost ? data.guestMoves : data.hostMoves;
-      
+
       // Update local state derived from server state
       if (screen !== 'setup' || (myBottles && myBottles.length > 0)) {
-           setPlayerBottles(myBottles || []);
+        setPlayerBottles(myBottles || []);
       }
-      
-      setOpponentBottles(oppBottles || []); 
+
+      setOpponentBottles(oppBottles || []);
       setPlayerName(amIHost ? data.hostName : data.guestName);
-      
+
       if (data.status === 'setup' && screen !== 'setup' && screen !== 'guess') {
         setScreen('setup');
       }
 
       if (data.status === 'playing' && screen !== 'guess') {
-         setScreen('guess');
+        setScreen('guess');
       }
 
       // Auto-Start Game
       if (data.status !== 'playing' && data.hostBottles && data.guestBottles && data.hostBottles.length === 4 && data.guestBottles.length === 4) {
-          if (amIHost) {
-              updateDoc(gameRef, { status: 'playing' });
-          }
+        if (amIHost) {
+          updateDoc(gameRef, { status: 'playing' });
+        }
       }
 
       // Construct Grids for UI
@@ -465,16 +465,16 @@ export default function BottleshipApp() {
         setCurrentTurn(data.turn === (amIHost ? 'host' : 'guest') ? 'player' : 'opponent');
         setMessage(data.turn === (amIHost ? 'host' : 'guest') ? "Your Turn" : "Opponent's Turn");
       }
-      
+
       if (data.winner) {
-         setWinner(data.winner === (amIHost ? 'host' : 'guest') ? 'player' : 'opponent');
-         if (!winner && data.winner) {
-            if(data.winner === (amIHost ? 'host' : 'guest')) {
-               finishGame('player');
-            } else {
-               finishGame('opponent');
-            }
-         }
+        setWinner(data.winner === (amIHost ? 'host' : 'guest') ? 'player' : 'opponent');
+        if (!winner && data.winner) {
+          if (data.winner === (amIHost ? 'host' : 'guest')) {
+            finishGame('player');
+          } else {
+            finishGame('opponent');
+          }
+        }
       }
 
     }, (error) => {
@@ -538,18 +538,18 @@ export default function BottleshipApp() {
     const code = Math.random().toString(36).substring(2, 8).toUpperCase();
     setRoomCode(code);
     setIsHost(true);
-    setPlayerName("Host"); 
+    setPlayerName("Host");
 
     const gameRef = doc(db, 'artifacts', appId, 'public', 'data', 'bottleship', code);
     await setDoc(gameRef, {
-        host: user.uid,
-        hostName: "Player 1",
-        guestName: "Player 2",
-        status: 'waiting',
-        turn: 'host', 
-        hostMoves: {},
-        guestMoves: {},
-        created: Date.now()
+      host: user.uid,
+      hostName: "Player 1",
+      guestName: "Player 2",
+      status: 'waiting',
+      turn: 'host',
+      hostMoves: {},
+      guestMoves: {},
+      created: Date.now()
     });
 
     setScreen("online-waiting");
@@ -567,18 +567,18 @@ export default function BottleshipApp() {
     const snap = await getDoc(gameRef);
 
     if (!snap.exists()) {
-        alert('Room not found');
-        return;
+      alert('Room not found');
+      return;
     }
 
     if (snap.data().guest && snap.data().guest !== user.uid) {
-        alert("Room full");
-        return;
+      alert("Room full");
+      return;
     }
 
     await updateDoc(gameRef, {
-        guest: user.uid,
-        status: 'setup'
+      guest: user.uid,
+      status: 'setup'
     });
 
     setRoomCode(code);
@@ -602,11 +602,11 @@ export default function BottleshipApp() {
     }
 
     if (mode === "online") {
-        const gameRef = doc(db, 'artifacts', appId, 'public', 'data', 'bottleship', roomCode);
-        const updateData = isHost ? { hostBottles: playerBottles } : { guestBottles: playerBottles };
-        await updateDoc(gameRef, updateData);
-        setMessage("Waiting for opponent...");
-        return; 
+      const gameRef = doc(db, 'artifacts', appId, 'public', 'data', 'bottleship', roomCode);
+      const updateData = isHost ? { hostBottles: playerBottles } : { guestBottles: playerBottles };
+      await updateDoc(gameRef, updateData);
+      setMessage("Waiting for opponent...");
+      return;
     }
 
     if (mode === "ai") {
@@ -638,70 +638,70 @@ export default function BottleshipApp() {
     setTempSecondBottles([]);
     setActivePlayer(1);
     setCurrentTurn("player");
-    setScreen("guess-pass");
+    setScreen("guess");
     setMessage(`${player1Name}'s turn`);
   }
 
   async function playerGuess(cell) {
     if (winner) return;
-    
+
     // --- Online Mode Logic ---
     if (mode === 'online') {
-        if (currentTurn !== 'player') return;
-        
-        // Derived check to ensure we know exactly who we are based on DB state
-        const isSelfPlay = onlineGameData.host === onlineGameData.guest;
-        const amIHost = isSelfPlay ? isHost : (onlineGameData.host === user.uid);
-        
-        if (playerGrid[idx(cell)]) return; 
+      if (currentTurn !== 'player') return;
 
-        const gameRef = doc(db, 'artifacts', appId, 'public', 'data', 'bottleship', roomCode);
-        // Use amIHost here instead of isHost state
-        const oppBottles = amIHost ? onlineGameData.guestBottles : onlineGameData.hostBottles;
-        const hit = oppBottles.includes(cell);
-        const result = hit ? 'hit' : 'miss';
+      // Derived check to ensure we know exactly who we are based on DB state
+      const isSelfPlay = onlineGameData.host === onlineGameData.guest;
+      const amIHost = isSelfPlay ? isHost : (onlineGameData.host === user.uid);
 
-        const myMoves = amIHost ? onlineGameData.hostMoves : onlineGameData.guestMoves;
-        const newMoves = { ...myMoves, [cell]: result };
+      if (playerGrid[idx(cell)]) return;
 
-        let newWinner = null;
-        let hitsCount = Object.values(newMoves).filter(v => v === 'hit').length;
-        if (hitsCount >= 4) {
-            newWinner = amIHost ? 'host' : 'guest';
-        }
+      const gameRef = doc(db, 'artifacts', appId, 'public', 'data', 'bottleship', roomCode);
+      // Use amIHost here instead of isHost state
+      const oppBottles = amIHost ? onlineGameData.guestBottles : onlineGameData.hostBottles;
+      const hit = oppBottles.includes(cell);
+      const result = hit ? 'hit' : 'miss';
 
-        const updatePayload = {
-            [amIHost ? 'hostMoves' : 'guestMoves']: newMoves
-        };
+      const myMoves = amIHost ? onlineGameData.hostMoves : onlineGameData.guestMoves;
+      const newMoves = { ...myMoves, [cell]: result };
 
-        if (newWinner) {
-            updatePayload.winner = newWinner;
-            updatePayload.status = 'finished';
-        } else if (!hit) {
-            updatePayload.turn = amIHost ? 'guest' : 'host';
-        }
+      let newWinner = null;
+      let hitsCount = Object.values(newMoves).filter(v => v === 'hit').length;
+      if (hitsCount >= 4) {
+        newWinner = amIHost ? 'host' : 'guest';
+      }
 
-        if (hit) {
-             if (sounds.hit) sounds.hit.play().catch(() => {});
-        } else {
-             if (sounds.miss) sounds.miss.play().catch(() => {});
-        }
+      const updatePayload = {
+        [amIHost ? 'hostMoves' : 'guestMoves']: newMoves
+      };
 
-        await updateDoc(gameRef, updatePayload);
-        return;
+      if (newWinner) {
+        updatePayload.winner = newWinner;
+        updatePayload.status = 'finished';
+      } else if (!hit) {
+        updatePayload.turn = amIHost ? 'guest' : 'host';
+      }
+
+      if (hit) {
+        if (sounds.hit) sounds.hit.play().catch(() => { });
+      } else {
+        if (sounds.miss) sounds.miss.play().catch(() => { });
+      }
+
+      await updateDoc(gameRef, updatePayload);
+      return;
     }
 
     // --- Pass & Play Mode Logic ---
     if (mode === "pass") {
       const i = idx(cell);
-      
+
       if (activePlayer === 1) {
         if (playerGrid[i]) {
           setMessage("Already guessed");
           return;
         }
         const hit = opponentBottles.includes(cell); // P1 guesses on P2's bottles
-        
+
         // Optimistic Update
         const newGrid = [...playerGrid];
         newGrid[i] = hit ? "hit" : "miss";
@@ -729,7 +729,7 @@ export default function BottleshipApp() {
           return;
         }
         const hit = playerBottles.includes(cell); // P2 guesses on P1's bottles
-        
+
         const newGrid = [...opponentGrid];
         newGrid[i] = hit ? "hit" : "miss";
         setOpponentGrid(newGrid);
@@ -792,7 +792,7 @@ export default function BottleshipApp() {
   function aiPlay() {
     const next = aiRef.current.nextMove();
     if (!next) {
-      finishGame("player"); 
+      finishGame("player");
       return;
     }
     const i = idx(next);
@@ -826,7 +826,7 @@ export default function BottleshipApp() {
     if (mode === "pass") {
       setMessage(w === 1 ? `${player1Name} Wins! 🎉` : `${player2Name} Wins! 🎉`);
     } else if (mode === "online") {
-        setMessage(w === 'player' ? 'You Win! 🎉' : 'Opponent Wins! 💀');
+      setMessage(w === 'player' ? 'You Win! 🎉' : 'Opponent Wins! 💀');
     } else {
       setMessage(w === "player" ? `${playerName} Wins! 🎉` : "AI Wins!");
     }
@@ -875,7 +875,25 @@ export default function BottleshipApp() {
       {showConfetti && <Confetti />}
 
       <div style={{ width: '100%', maxWidth: '800px', margin: '0 auto' }}>
-        <h1 style={{ fontSize: 'clamp(28px, 8vw, 36px)', fontWeight: 800, color: '#3730a3', textAlign: 'center', marginBottom: '12px' }}>🧴 Bottleship</h1>
+        <h1 style={{
+          fontSize: 'clamp(32px, 8vw, 48px)',
+          fontWeight: 900,
+          textAlign: 'center',
+          marginBottom: '24px',
+          animation: 'float 3s ease-in-out infinite'
+        }}>
+          {/* Emoji stays normal */}
+          <span style={{ display: 'inline-block', marginRight: '10px' }}>🧴</span>
+
+          {/* Text gets the cool gradient */}
+          <span style={{
+            background: 'linear-gradient(135deg, #4f46e5, #ec4899)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent'
+          }}>
+            Bottleship
+          </span>
+        </h1>
 
         {screen === 'menu' && (
           <div style={{ background: 'rgba(255,255,255,0.95)', padding: '20px', borderRadius: '16px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
@@ -889,9 +907,9 @@ export default function BottleshipApp() {
               <button onClick={() => setScreen('tutorial')} style={{ background: 'transparent', border: 'none', color: '#374151', textDecoration: 'underline', cursor: 'pointer', fontSize: '14px', fontWeight: 600, fontFamily: 'inherit' }}>📖 How to play</button>
               <button onClick={() => { resetAll(); setScreen('menu'); }} style={{ background: 'transparent', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: '14px', fontFamily: 'inherit' }}>🔄 Reset</button>
             </div>
-             <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid #e5e7eb', textAlign: 'center' }}>
+            <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid #e5e7eb', textAlign: 'center' }}>
               <p style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#6b7280' }}>
-                 Original Game by Ruchit Kukadiya
+                Original Game by Ruchit Kukadiya
               </p>
             </div>
           </div>
@@ -989,6 +1007,19 @@ export default function BottleshipApp() {
           <div style={{ background: 'rgba(255,255,255,0.95)', padding: '16px', borderRadius: '16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
               <h3 style={{ margin: 0, fontSize: 'clamp(16px, 4vw, 18px)', fontWeight: 700 }}>{playerName} – Place 4 bottles</h3>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', margin: '12px 0' }}>
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} style={{
+                    width: '12px',
+                    height: '12px',
+                    borderRadius: '50%',
+                    background: i < playerBottles.length ? '#10b981' : '#e5e7eb', // Green if placed, Gray if empty
+                    border: '1px solid #d1d5db',
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    transform: i < playerBottles.length ? 'scale(1.2)' : 'scale(1)'
+                  }} />
+                ))}
+              </div>
               <div style={{ display: 'flex', gap: '6px' }}>
                 <button onClick={() => autoPlace(setPlayerBottles)} style={{ padding: '6px 10px', borderRadius: '6px', background: '#06b6d4', color: 'white', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 600, fontFamily: 'inherit' }}>Auto</button>
                 <button onClick={() => setPlayerBottles([])} style={{ padding: '6px 10px', borderRadius: '6px', background: '#e5e7eb', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 600, fontFamily: 'inherit' }}>Clear</button>
@@ -1025,7 +1056,7 @@ export default function BottleshipApp() {
               </button>
               <button onClick={() => { setScreen('menu'); resetAll(); }} style={{ padding: '12px 24px', borderRadius: '8px', background: '#e5e7eb', border: 'none', cursor: 'pointer', fontSize: '15px', fontWeight: 600, fontFamily: 'inherit' }}>Cancel</button>
             </div>
-             {mode === 'online' && message && <p style={{textAlign: 'center', color: '#666', marginTop: 10}}>{message}</p>}
+            {mode === 'online' && message && <p style={{ textAlign: 'center', color: '#666', marginTop: 10 }}>{message}</p>}
           </div>
         )}
 
@@ -1033,6 +1064,21 @@ export default function BottleshipApp() {
           <div style={{ background: 'rgba(255,255,255,0.95)', padding: '16px', borderRadius: '16px' }}>
             <h3 style={{ marginTop: 0, textAlign: 'center', color: '#10b981', fontSize: 'clamp(18px, 5vw, 20px)', fontWeight: 700 }}>{player1Name}: Place 4 bottles</h3>
             <p style={{ textAlign: 'center', color: '#6b7280', marginBottom: '16px', fontSize: '14px' }}>Don't let {player2Name} see!</p>
+
+            {/* Minimal Dot Indicator */}
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', margin: '12px 0' }}>
+              {[...Array(4)].map((_, i) => (
+                <div key={i} style={{
+                  width: '12px',
+                  height: '12px',
+                  borderRadius: '50%',
+                  background: i < playerBottles.length ? '#10b981' : '#e5e7eb',
+                  border: '1px solid #d1d5db',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  transform: i < playerBottles.length ? 'scale(1.2)' : 'scale(1)'
+                }} />
+              ))}
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', maxWidth: '400px', margin: '0 auto 16px auto' }}>
               {ALL_CELLS.map((c) => (
                 <button
@@ -1065,6 +1111,20 @@ export default function BottleshipApp() {
         {screen === 'setup-pass-2' && (
           <div style={{ background: 'rgba(255,255,255,0.95)', padding: '16px', borderRadius: '16px' }}>
             <h3 style={{ marginTop: 0, textAlign: 'center', color: '#0ea5e9', fontSize: 'clamp(18px, 5vw, 20px)', fontWeight: 700 }}>{player2Name}: Place 4 bottles</h3>
+            {/* Minimal Dot Indicator for Player 2 */}
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', margin: '12px 0' }}>
+              {[...Array(4)].map((_, i) => (
+                <div key={i} style={{
+                  width: '12px',
+                  height: '12px',
+                  borderRadius: '50%',
+                  background: i < tempSecondBottles.length ? '#10b981' : '#e5e7eb',
+                  border: '1px solid #d1d5db',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  transform: i < tempSecondBottles.length ? 'scale(1.2)' : 'scale(1)'
+                }} />
+              ))}
+            </div>
             <p style={{ textAlign: 'center', color: '#6b7280', marginBottom: '16px', fontSize: '14px' }}>Don't let {player1Name} see!</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', maxWidth: '400px', margin: '0 auto 16px auto' }}>
               {ALL_CELLS.map((c) => (
@@ -1113,9 +1173,12 @@ export default function BottleshipApp() {
                 maxWidth: '300px'
               }}>
                 <h2 style={{ fontSize: 'clamp(22px, 6vw, 28px)', margin: '0 0 16px 0', fontWeight: 800 }}>
-                  {mode === 'online'
-                    ? (winner === 'player' ? '🎉 You Win!' : '💀 Opponent Wins')
-                    : (winner === 'player' ? `🎉 ${playerName} Wins!` : '😢 AI Wins!')}
+                  {mode === 'pass'
+                    ? (winner === 1 ? `🎉 ${player1Name} Wins!` : `🎉 ${player2Name} Wins!`)
+                    : mode === 'online'
+                      ? (winner === 'player' ? '🎉 You Win!' : '💀 Opponent Wins')
+                      : (winner === 'player' ? `🎉 ${playerName} Wins!` : '😢 AI Wins!')
+                  }
                 </h2>
                 <div style={{ marginTop: 20, display: 'flex', gap: '8px', flexDirection: 'column' }}>
                   <button
@@ -1143,10 +1206,80 @@ export default function BottleshipApp() {
 
             <div style={{ marginBottom: '12px', textAlign: 'center' }}>
               <h3 style={{ margin: '0 0 4px 0', fontSize: 'clamp(16px, 4vw, 18px)', fontWeight: 700 }}>
-                {mode === 'online' ? 'Online Match' : `${playerName} VS AI`}
+                {mode === 'online' ? 'Online Match' : mode === 'pass' ? `${player1Name} vs ${player2Name}` : `${playerName} VS AI`}
               </h3>
               <div style={{ color: '#6b7280', fontWeight: 600, fontSize: 'clamp(12px, 3vw, 14px)' }}>{message}</div>
             </div>
+
+            {/* --- NEW TURN INDICATOR LOGIC --- */}
+            {(() => {
+              // Determine aesthetics based on whose turn it is
+              let theme = { color: '#6b7280', text: 'Game Over', icon: '🏁', bg: '#f3f4f6' };
+
+              if (!winner) {
+                if (mode === 'pass') {
+                  if (activePlayer === 1) theme = { color: '#4f46e5', text: `${player1Name}'s Turn`, icon: '👤', bg: '#eef2ff' }; // Player 1 Blue
+                  else theme = { color: '#f59e0b', text: `${player2Name}'s Turn`, icon: '👤', bg: '#fffbeb' }; // Player 2 Orange
+                } else {
+                  // AI or Online
+                  if (currentTurn === 'player') theme = { color: '#10b981', text: 'YOUR TURN', icon: '🟢', bg: '#ecfdf5' }; // Green
+                  else theme = { color: '#ef4444', text: mode === 'ai' ? 'AI THINKING...' : "OPPONENT'S TURN", icon: '🛑', bg: '#fef2f2' }; // Red
+                }
+              }
+
+              return (
+                <div style={{ marginBottom: '20px', textAlign: 'center' }}>
+                  {/* Match Title */}
+                  <h3 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                    {mode === 'online' ? 'Online Match' : mode === 'pass' ? 'PvP Match' : 'Single Player'}
+                  </h3>
+
+                  {/* THE BIG ANIMATED BANNER */}
+                  <div style={{
+                    background: theme.bg,
+                    border: `2px solid ${theme.color}`,
+                    color: theme.color,
+                    padding: '16px',
+                    borderRadius: '12px',
+                    boxShadow: `0 4px 12px ${theme.color}33`, // 33 is opacity
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '12px',
+                    transform: 'scale(1)',
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    animation: !winner ? 'pulse-border 2s infinite' : 'none'
+                  }}>
+                    <span style={{ fontSize: '24px', filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.1))' }}>{theme.icon}</span>
+                    <span style={{ fontSize: 'clamp(18px, 5vw, 24px)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      {theme.text}
+                    </span>
+                  </div>
+
+                  {/* Small Status Message (Hit/Miss feedback) */}
+                  <div style={{
+                    marginTop: '8px',
+                    height: '20px',
+                    color: message.includes('Hit') ? '#10b981' : '#6b7280',
+                    fontWeight: 600,
+                    fontSize: '14px',
+                    opacity: message ? 1 : 0,
+                    transition: 'opacity 0.2s'
+                  }}>
+                    {message}
+                  </div>
+
+                  {/* Animation Styles */}
+                  <style>{`
+            @keyframes pulse-border {
+              0% { box-shadow: 0 0 0 0px ${theme.color}40; transform: scale(1); }
+              50% { box-shadow: 0 0 0 6px ${theme.color}00; transform: scale(1.02); }
+              100% { box-shadow: 0 0 0 0px ${theme.color}00; transform: scale(1); }
+            }
+          `}</style>
+                </div>
+              );
+            })()}
 
             <div style={{ display: 'grid', gridTemplateColumns: window.innerWidth >= 640 ? '1fr 0fr 1fr' : '1fr', gap: '16px', maxWidth: '800px', margin: '0 auto' }}>
               <div>
@@ -1156,8 +1289,7 @@ export default function BottleshipApp() {
                 </h4>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
                   {ALL_CELLS.map((c, i) => {
-                    const state = playerGrid[i];
-                    return (
+                    const state = (mode === 'pass' && activePlayer === 2) ? opponentGrid[i] : playerGrid[i]; return (
                       <button
                         key={c}
                         onClick={() => playerGuess(c)}
@@ -1213,8 +1345,8 @@ export default function BottleshipApp() {
               <div>
                 <h4 style={{ margin: '0 0 8px 0', fontSize: 'clamp(13px, 3.5vw, 14px)', fontWeight: 700, textAlign: 'center', color: '#10b981' }}>🛡️ Your Board</h4>                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
                   {ALL_CELLS.map((c, i) => {
-                    const state = opponentGrid[i];
-                    const hasBottle = playerBottles.includes(c);
+                    const state = (mode === 'pass' && activePlayer === 2) ? playerGrid[i] : opponentGrid[i];
+                    const hasBottle = (mode === 'pass' && activePlayer === 2) ? opponentBottles.includes(c) : playerBottles.includes(c);
                     return (
                       <div
                         key={c}
