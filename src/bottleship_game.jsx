@@ -361,6 +361,7 @@ export default function BottleshipApp() {
   const [player1Name, setPlayer1Name] = useState("");
   const [player2Name, setPlayer2Name] = useState("");
   const [playerName, setPlayerName] = useState("");
+  const [opponentName, setOpponentName] = useState("Opponent"); // NEW
 
   // Online specific state
   const [roomCode, setRoomCode] = useState("");
@@ -439,8 +440,29 @@ export default function BottleshipApp() {
       setOpponentBottles(oppBottles || []);
       setPlayerName(amIHost ? data.hostName : data.guestName);
 
-      if (data.status === 'setup' && screen !== 'setup' && screen !== 'guess') {
-        setScreen('setup');
+      // --- NEW NAME SYNC LOGIC ---
+      if (amIHost) {
+        setPlayerName(data.hostName || "Host");
+        setOpponentName(data.guestName || "Guest"); // Save opponent name
+      } else {
+        setPlayerName(data.guestName || "Guest");
+        setOpponentName(data.hostName || "Host"); // Save opponent name
+      }
+
+      // Handle Rematch/Reset Logic
+      if (data.status === 'setup') {
+        // If we are currently on the Game Over screen (guess) or playing, reset us
+        if (screen === 'guess' || screen === 'playing') {
+          setWinner(null);
+          setPlayerBottles([]);
+          setOpponentBottles([]);
+          setPlayerGrid(ALL_CELLS.map(() => null));
+          setOpponentGrid(ALL_CELLS.map(() => null));
+          setScreen('setup');
+          setMessage("Rematch! Place your bottles.");
+        } else if (screen !== 'setup') {
+          setScreen('setup');
+        }
       }
 
       if (data.status === 'playing' && screen !== 'guess') {
@@ -498,6 +520,7 @@ export default function BottleshipApp() {
     setPlayer1Name("");
     setPlayer2Name("");
     setPlayerName("");
+    setOpponentName("Opponent"); // NEW
     setRoomCode("");
     setJoinRoomInput("");
     setIsHost(false);
@@ -530,7 +553,7 @@ export default function BottleshipApp() {
   function startOnlineMode() {
     resetAll();
     setMode("online");
-    setScreen("online-setup");
+    setScreen("name-input-online");
   }
 
   async function createRoom() {
@@ -543,7 +566,7 @@ export default function BottleshipApp() {
     const gameRef = doc(db, 'artifacts', appId, 'public', 'data', 'bottleship', code);
     await setDoc(gameRef, {
       host: user.uid,
-      hostName: "Player 1",
+      hostName: playerName || "Player 1",
       guestName: "Player 2",
       status: 'waiting',
       turn: 'host',
@@ -578,6 +601,7 @@ export default function BottleshipApp() {
 
     await updateDoc(gameRef, {
       guest: user.uid,
+      guestName: playerName || "Guest",
       status: 'setup'
     });
 
@@ -826,7 +850,9 @@ export default function BottleshipApp() {
     if (mode === "pass") {
       setMessage(w === 1 ? `${player1Name} Wins! 🎉` : `${player2Name} Wins! 🎉`);
     } else if (mode === "online") {
-      setMessage(w === 'player' ? 'You Win! 🎉' : 'Opponent Wins! 💀');
+      // Use real names for the result message
+      const wName = w === 'player' ? playerName : opponentName;
+      setMessage(`${wName} Wins! 🎉`);
     } else {
       setMessage(w === "player" ? `${playerName} Wins! 🎉` : "AI Wins!");
     }
@@ -870,6 +896,39 @@ export default function BottleshipApp() {
 
   const baseStyle = { fontFamily: 'system-ui, -apple-system, sans-serif' };
 
+  const handlePlayAgain = async () => {
+    if (mode === 'pass') {
+      setWinner(null);
+      setPlayerBottles([]);
+      setOpponentBottles([]);
+      setPlayerGrid(ALL_CELLS.map(() => null));
+      setOpponentGrid(ALL_CELLS.map(() => null));
+      setActivePlayer(1);
+      setCurrentTurn('player');
+      setScreen('setup-pass');
+    } else if (mode === 'online') {
+      // Reset DB state to setup
+      const gameRef = doc(db, 'artifacts', appId, 'public', 'data', 'bottleship', roomCode);
+      await updateDoc(gameRef, {
+        status: 'setup',
+        hostBottles: [],
+        guestBottles: [],
+        hostMoves: {},
+        guestMoves: {},
+        winner: null,
+        turn: 'host'
+      });
+    } else if (mode === 'ai') {
+      setWinner(null);
+      setPlayerBottles([]);
+      setOpponentBottles([]);
+      setPlayerGrid(ALL_CELLS.map(() => null));
+      setOpponentGrid(ALL_CELLS.map(() => null));
+      aiRef.current.reset();
+      setScreen('setup');
+    }
+  };
+
   return (
     <div style={{ ...baseStyle, minHeight: '100vh', padding: '12px', background: 'linear-gradient(135deg,#eef2ff,#fff7ed)' }}>
       {showConfetti && <Confetti />}
@@ -905,7 +964,8 @@ export default function BottleshipApp() {
             </div>
             <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'center', gap: '12px', flexWrap: 'wrap' }}>
               <button onClick={() => setScreen('tutorial')} style={{ background: 'transparent', border: 'none', color: '#374151', textDecoration: 'underline', cursor: 'pointer', fontSize: '14px', fontWeight: 600, fontFamily: 'inherit' }}>📖 How to play</button>
-              <button onClick={() => { resetAll(); setScreen('menu'); }} style={{ background: 'transparent', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: '14px', fontFamily: 'inherit' }}>🔄 Reset</button>
+              {/* Feedback Button Replaces Reset */}
+              <button onClick={() => window.location.href = "mailto:your@email.com?subject=Bottleship Feedback"} style={{ background: 'transparent', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: '14px', fontFamily: 'inherit' }}>💌 Feedback</button>
             </div>
             <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid #e5e7eb', textAlign: 'center' }}>
               <p style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#6b7280' }}>
@@ -954,6 +1014,23 @@ export default function BottleshipApp() {
               >
                 Back
               </button>
+            </div>
+          </div>
+        )}
+
+        {screen === 'name-input-online' && (
+          <div style={{ background: 'rgba(255,255,255,0.95)', padding: '24px', borderRadius: '16px', maxWidth: '400px', margin: '0 auto' }}>
+            <h3 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '16px', textAlign: 'center' }}>Enter Name for Online</h3>
+            <input
+              type="text"
+              value={playerName}
+              onChange={(e) => setPlayerName(e.target.value)}
+              placeholder="Your name"
+              style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '2px solid #e5e7eb', fontSize: '16px', marginBottom: '16px', boxSizing: 'border-box', fontFamily: 'inherit' }}
+            />
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={() => { if (playerName.trim()) setScreen('online-setup'); }} style={{ flex: 1, padding: '12px', borderRadius: '8px', background: '#4f46e5', color: 'white', border: 'none', cursor: 'pointer', fontSize: '16px', fontWeight: 600, fontFamily: 'inherit' }}>Continue</button>
+              <button onClick={() => { resetAll(); setScreen('menu'); }} style={{ padding: '12px', borderRadius: '8px', background: '#e5e7eb', border: 'none', cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}>Back</button>
             </div>
           </div>
         )}
@@ -1176,7 +1253,7 @@ export default function BottleshipApp() {
                   {mode === 'pass'
                     ? (winner === 1 ? `🎉 ${player1Name} Wins!` : `🎉 ${player2Name} Wins!`)
                     : mode === 'online'
-                      ? (winner === 'player' ? '🎉 You Win!' : '💀 Opponent Wins')
+                      ? (winner === 'player' ? `🎉 ${playerName} Wins!` : `💀 ${opponentName} Wins!`)
                       : (winner === 'player' ? `🎉 ${playerName} Wins!` : '😢 AI Wins!')
                   }
                 </h2>
@@ -1187,19 +1264,9 @@ export default function BottleshipApp() {
                   >
                     Main Menu
                   </button>
-                  {mode !== 'online' && (
-                    <button
-                      onClick={() => {
-                        resetAll();
-                        setMode('ai');
-                        setPlayerName(playerName);
-                        setScreen('setup');
-                      }}
-                      style={{ padding: '12px', borderRadius: '8px', background: '#10b981', color: 'white', border: 'none', cursor: 'pointer', fontSize: '15px', fontWeight: 600, fontFamily: 'inherit' }}
-                    >
-                      Play Again
-                    </button>
-                  )}
+                  <button onClick={handlePlayAgain} style={{ padding: '12px', borderRadius: '8px', background: '#10b981', color: 'white', border: 'none', cursor: 'pointer', fontSize: '15px', fontWeight: 600, fontFamily: 'inherit' }}>
+                    🔄 Play Again
+                  </button>
                 </div>
               </div>
             )}
@@ -1221,9 +1288,18 @@ export default function BottleshipApp() {
                   if (activePlayer === 1) theme = { color: '#4f46e5', text: `${player1Name}'s Turn`, icon: '👤', bg: '#eef2ff' }; // Player 1 Blue
                   else theme = { color: '#f59e0b', text: `${player2Name}'s Turn`, icon: '👤', bg: '#fffbeb' }; // Player 2 Orange
                 } else {
-                  // AI or Online
-                  if (currentTurn === 'player') theme = { color: '#10b981', text: 'YOUR TURN', icon: '🟢', bg: '#ecfdf5' }; // Green
-                  else theme = { color: '#ef4444', text: mode === 'ai' ? 'AI THINKING...' : "OPPONENT'S TURN", icon: '🛑', bg: '#fef2f2' }; // Red
+                  // Online or AI Mode
+                  if (currentTurn === 'player') {
+                    theme = { color: '#10b981', text: `${playerName}'s TURN`, icon: '🟢', bg: '#ecfdf5' };
+                  } else {
+                    theme = {
+                      color: '#ef4444',
+                      // Show "AI Thinking" or "Real Name's Turn"
+                      text: mode === 'ai' ? 'AI THINKING...' : `${opponentName}'s TURN`,
+                      icon: '🛑',
+                      bg: '#fef2f2'
+                    };
+                  }
                 }
               }
 
