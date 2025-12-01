@@ -369,6 +369,10 @@ export default function BottleshipApp() {
   const [isHost, setIsHost] = useState(false);
   const [onlineGameData, setOnlineGameData] = useState(null);
 
+  // NEW: Track if opponent left and if we are the one leaving
+  const [showOpponentLeft, setShowOpponentLeft] = useState(false);
+  const isLeavingRef = useRef(false);
+
   const sounds = useMemo(() => {
     // Disabled audio for now as assets are missing
     return {
@@ -421,6 +425,15 @@ export default function BottleshipApp() {
 
       const data = snapshot.data();
       setOnlineGameData(data);
+
+      // --- DETECT ABANDONMENT ---
+      if (data.status === 'abandoned') {
+        // Only show the popup if WE aren't the one who clicked Exit
+        if (!isLeavingRef.current && screen !== 'menu') {
+          setShowOpponentLeft(true);
+        }
+        return;
+      }
 
       // --- CRITICAL FIX FOR SELF-PLAY TESTING ---
       // If both players are the same user (browser tabs), use local state 'isHost' to distinguish.
@@ -506,6 +519,22 @@ export default function BottleshipApp() {
     return () => unsub();
   }, [mode, roomCode, user, screen, isHost]);
 
+  async function leaveOnlineRoom() {
+    // 1. Mark that WE are intentionally leaving, so we ignore any 'abandoned' updates
+    isLeavingRef.current = true;
+
+    if (mode === 'online' && roomCode) {
+      try {
+        const gameRef = doc(db, 'artifacts', appId, 'public', 'data', 'bottleship', roomCode);
+        // 2. This update triggers onSnapshot immediately (locally)
+        await updateDoc(gameRef, { status: 'abandoned' });
+      } catch (e) {
+        console.error("Error leaving room:", e);
+      }
+    }
+    resetAll();
+    setScreen('menu');
+  }
 
   function resetAll() {
     setPlayerBottles([]);
@@ -525,6 +554,9 @@ export default function BottleshipApp() {
     setJoinRoomInput("");
     setIsHost(false);
     setOnlineGameData(null);
+    // NEW: Reset the leaving flag and the popup state
+    isLeavingRef.current = false;
+    setShowOpponentLeft(false);
     aiRef.current.reset();
   }
 
@@ -1259,14 +1291,21 @@ export default function BottleshipApp() {
                 </h2>
                 <div style={{ marginTop: 20, display: 'flex', gap: '8px', flexDirection: 'column' }}>
                   <button
-                    onClick={() => { resetAll(); setScreen('menu'); }}
+                    onClick={() => mode === 'online' ? leaveOnlineRoom() : resetAll()}
                     style={{ padding: '12px', borderRadius: '8px', background: '#4f46e5', color: 'white', border: 'none', cursor: 'pointer', fontSize: '15px', fontWeight: 600, fontFamily: 'inherit' }}
                   >
                     Main Menu
                   </button>
-                  <button onClick={handlePlayAgain} style={{ padding: '12px', borderRadius: '8px', background: '#10b981', color: 'white', border: 'none', cursor: 'pointer', fontSize: '15px', fontWeight: 600, fontFamily: 'inherit' }}>
-                    🔄 Play Again
-                  </button>
+                  {/* Play Again Logic: Only Host sees button in Online Mode */}
+                  {mode === 'online' && !isHost ? (
+                    <div style={{ padding: '12px', borderRadius: '8px', background: 'rgba(255,255,255,0.2)', color: 'white', fontSize: '14px', fontStyle: 'italic' }}>
+                      ⏳ Waiting for Host to restart...
+                    </div>
+                  ) : (
+                    <button onClick={handlePlayAgain} style={{ padding: '12px', borderRadius: '8px', background: '#10b981', color: 'white', border: 'none', cursor: 'pointer', fontSize: '15px', fontWeight: 600, fontFamily: 'inherit' }}>
+                      🔄 Play Again
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -1453,7 +1492,7 @@ export default function BottleshipApp() {
             </div>
 
             <div style={{ marginTop: '12px', textAlign: 'center' }}>
-              <button onClick={() => { resetAll(); setScreen('menu'); }} style={{ padding: '10px 20px', borderRadius: '8px', background: '#e5e7eb', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: 600, fontFamily: 'inherit' }}>Exit</button>
+              <button onClick={() => mode === 'online' ? leaveOnlineRoom() : resetAll()} style={{ padding: '10px 20px', borderRadius: '8px', background: '#e5e7eb', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: 600, fontFamily: 'inherit' }}>Exit</button>
             </div>
             <style>{`
               @keyframes popIn {
@@ -1553,7 +1592,12 @@ export default function BottleshipApp() {
             )}
 
             <button
-              onClick={() => {
+              onClick={async () => {
+                // If we cancel while waiting, we should probably just destroy/abandon the room so it doesn't stay open
+                if (roomCode) {
+                  const gameRef = doc(db, 'artifacts', appId, 'public', 'data', 'bottleship', roomCode);
+                  await updateDoc(gameRef, { status: 'abandoned' });
+                }
                 resetAll();
                 setScreen('menu');
               }}
@@ -1565,6 +1609,43 @@ export default function BottleshipApp() {
         )}
 
       </div>
+
+      {/* NEW: Opponent Left Modal */}
+      {showOpponentLeft && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+          background: 'rgba(0,0,0,0.5)', zIndex: 2000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          animation: 'fadeIn 0.2s'
+        }}>
+          <div style={{
+            background: 'white', padding: '24px', borderRadius: '16px',
+            maxWidth: '300px', textAlign: 'center',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.2)'
+          }}>
+            <div style={{ fontSize: '48px', marginBottom: '12px' }}>🚪</div>
+            <h3 style={{ margin: '0 0 8px 0', fontSize: '20px', fontWeight: 700, color: '#1f2937' }}>Opponent Left</h3>
+            <p style={{ margin: '0 0 20px 0', color: '#6b7280', fontSize: '15px' }}>
+              The other player has disconnected from the match.
+            </p>
+            <button
+              onClick={() => {
+                setShowOpponentLeft(false);
+                resetAll();
+                setScreen('menu');
+              }}
+              style={{
+                width: '100%', padding: '12px', borderRadius: '8px',
+                background: '#4f46e5', color: 'white', border: 'none',
+                fontWeight: 600, cursor: 'pointer', fontSize: '16px'
+              }}
+            >
+              Return to Menu
+            </button>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
