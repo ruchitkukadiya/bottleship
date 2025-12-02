@@ -111,230 +111,215 @@ function Confetti() {
   );
 }
 
-function InteractiveTutorial({ onClose }) {
+function InteractiveTutorial({ onClose, sounds }) {
   const [step, setStep] = useState(0);
-  const [demoBottles, setDemoBottles] = useState([]);
-  const [demoGuessed, setDemoGuessed] = useState([]);
+  const [tutorialBottles, setTutorialBottles] = useState([]); // Stores user's setup
+  const [tutorialGuesses, setTutorialGuesses] = useState([]); // Stores user's shots
 
   const steps = [
     {
-      title: "Welcome to Bottleship!",
-      content: "A fun twist on classic Battleship. Sink all your opponent's bottles to win!",
-      emoji: "👋",
-      color: "#6366f1"
+      id: "setup",
+      title: "Step 1: Hide Your Fleet",
+      text: "Tap 4 squares to place your bottles.\nThese specific spots will be used next!",
+      task: "Place 4 bottles below",
+      mode: "setup"
     },
     {
-      title: "Step 1: Place Your Bottles",
-      content: "Click on 4 cells to place your bottles. Try it below!",
-      emoji: "🎯",
-      color: "#10b981",
-      demo: "setup"
+      id: "gameplay",
+      title: "Step 2: Attack Practice",
+      text: "Now, pretend you are the opponent.\nTry to find the bottles you just hid!",
+      task: "Find all 4 bottles!",
+      mode: "play"
     },
     {
-      title: "Step 2: Start Guessing",
-      content: "Now guess where your opponent's bottles are! Click any cell below.",
-      emoji: "🤔",
-      color: "#0ea5e9",
-      demo: "guess"
-    },
-    {
-      title: "Step 3: Hit or Miss?",
-      content: "💥 = Hit! Go again.\n⭕ = Miss. Turn switches.\nFirst to find all 4 wins!",
-      emoji: "🎯",
-      color: "#f59e0b",
-      demo: "result"
-    },
-    {
-      title: "Ready to Play!",
-      content: "You got it! Choose your mode:\n🤖 AI: Play against computer\n👥 Pass & Play: Same device\n🌐 Online: With friends",
-      emoji: "🎉",
-      color: "#ec4899"
+      id: "feedback",
+      title: "Step 3: Hit or Miss",
+      text: "💥 RED = HIT (You go again!)\n⭕ GRAY = MISS (Turn ends)\n\nYou are ready for the real ocean.",
+      action: "Start Game"
     }
   ];
 
-  const currentStep = steps[step];
+  const current = steps[step];
+  const isSetup = current.mode === "setup";
+  const isGameplay = current.mode === "play";
 
+  // Handle clicks with Game Logic + Sounds
   const handleDemoClick = (cell) => {
-    if (currentStep.demo === 'setup') {
-      setDemoBottles(prev => {
+    if (isSetup) {
+      setTutorialBottles(prev => {
         if (prev.includes(cell)) return prev.filter(c => c !== cell);
         if (prev.length >= 4) return prev;
         return [...prev, cell];
       });
-    } else if (currentStep.demo === 'guess') {
-      if (!demoGuessed.includes(cell)) {
-        setDemoGuessed(prev => [...prev, cell]);
+    } else if (isGameplay) {
+      if (!tutorialGuesses.includes(cell)) {
+        // Determine Hit/Miss based on Step 1 placements
+        const isHit = tutorialBottles.includes(cell);
+
+        // Play Sound (using cloneNode to allow overlapping sounds)
+        if (isHit) {
+          if (sounds && sounds.hit) sounds.hit.cloneNode(true).play().catch(() => { });
+        } else {
+          if (sounds && sounds.miss) sounds.miss.cloneNode(true).play().catch(() => { });
+        }
+
+        setTutorialGuesses(prev => [...prev, cell]);
       }
     }
   };
 
+  const canProceed = () => {
+    if (current.id === "feedback") return true;
+    if (isSetup) return tutorialBottles.length === 4;
+    // For gameplay, proceed if they found all 4 bottles
+    if (isGameplay) {
+      const foundCount = tutorialGuesses.filter(c => tutorialBottles.includes(c)).length;
+      return foundCount === 4;
+    }
+    return false;
+  };
+
+  const nextStep = () => {
+    if (step < steps.length - 1) {
+      setStep(s => s + 1);
+      // Do NOT reset bottles here, we keep them for Step 2
+    } else {
+      onClose();
+    }
+  };
+
   return (
-    <div style={{ background: 'rgba(255,255,255,0.98)', padding: '20px', borderRadius: '16px', maxWidth: '600px', margin: '0 auto', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-      <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-        <div style={{ fontSize: '64px', marginBottom: '12px', animation: 'bounce 1s infinite' }}>{currentStep.emoji}</div>
-        <h2 style={{ fontSize: 'clamp(20px, 5vw, 24px)', fontWeight: 800, color: currentStep.color, margin: '0 0 12px 0' }}>
-          {currentStep.title}
-        </h2>
-        <p style={{ fontSize: 'clamp(14px, 3.5vw, 16px)', color: '#374151', lineHeight: 1.6, whiteSpace: 'pre-line', padding: '0 10px' }}>
-          {currentStep.content}
-        </p>
-      </div>
-
-      {currentStep.demo === 'setup' && (
-        <div style={{ background: '#f3f4f6', padding: '16px', borderRadius: '12px', marginBottom: '16px' }}>
-          <p style={{ textAlign: 'center', fontSize: '14px', fontWeight: 600, color: '#6b7280', marginBottom: '12px' }}>
-            Click cells to place bottles ({demoBottles.length}/4)
+    <div style={{
+      position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+      backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+      zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontFamily: 'system-ui, -apple-system, sans-serif'
+    }}>
+      <div style={{
+        width: '100%', maxWidth: '380px', // Responsive width
+        background: '#ffffff', borderRadius: '24px',
+        boxShadow: '0 20px 40px -10px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.05)',
+        padding: '24px', position: 'relative', overflow: 'hidden',
+        display: 'flex', flexDirection: 'column', maxHeight: '90vh' // Prevent overflow on small mobiles
+      }}>
+<button onClick={onClose} style={{ position: 'absolute', top: '12px', right: '12px', background: '#f3f4f6', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', color: '#6b7280', zIndex: 10 }} aria-label="Close">✕</button>
+        {/* Header */}
+        <div style={{ textAlign: 'center', marginBottom: '16px', borderBottom: '1px solid #f3f4f6', paddingBottom: '12px' }}>
+          <h2 style={{ fontSize: '20px', fontWeight: 800, margin: '0 0 4px 0', color: '#3730a3' }}>How to Play</h2>
+          <p style={{ fontSize: '13px', color: '#6b7280', margin: 0, fontWeight: 500 }}>
+            Shatter the enemy bottles before yours get smashed.
           </p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', maxWidth: '300px', margin: '0 auto' }}>
-            {['A1', 'A2', 'A3', 'A4', 'B1', 'B2', 'B3', 'B4'].map((c) => (
-              <button
-                key={c}
-                onClick={() => handleDemoClick(c)}
-                style={{
-                  padding: '20px',
-                  background: demoBottles.includes(c) ? '#f59e0b' : '#fff',
-                  borderRadius: '8px',
-                  border: '2px solid #e5e7eb',
-                  fontSize: demoBottles.includes(c) ? '20px' : '14px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  animation: demoBottles.includes(c) ? 'plop 0.3s' : 'none'
-                }}>
-                {demoBottles.includes(c) ? '🧴' : c}
-              </button>
-            ))}
-          </div>
         </div>
-      )}
 
-      {currentStep.demo === 'guess' && (
-        <div style={{ background: '#f3f4f6', padding: '16px', borderRadius: '12px', marginBottom: '16px' }}>
-          <p style={{ textAlign: 'center', fontSize: '14px', fontWeight: 600, color: '#6b7280', marginBottom: '12px' }}>
-            Click to guess! ({demoGuessed.length} guesses)
-          </p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', maxWidth: '300px', margin: '0 auto' }}>
-            {['A1', 'A2', 'A3', 'A4', 'B1', 'B2', 'B3', 'B4'].map((c) => {
-              const guessed = demoGuessed.includes(c);
-              const isHit = ['A1', 'B2'].includes(c) && guessed;
-              const isMiss = !['A1', 'B2'].includes(c) && guessed;
-              return (
-                <button
-                  key={c}
-                  onClick={() => handleDemoClick(c)}
-                  style={{
-                    padding: '20px',
-                    background: isHit ? '#10b981' : isMiss ? '#e5e7eb' : '#fff',
-                    color: isHit ? '#fff' : isMiss ? '#6b7280' : '#1f2937',
-                    borderRadius: '8px',
-                    border: '2px solid ' + (guessed ? (isHit ? '#10b981' : '#9ca3af') : '#0ea5e9'),
-                    fontSize: guessed ? '20px' : '14px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    animation: guessed ? 'ping 0.5s' : 'pulse 2s infinite'
+        {/* Content */}
+        <div style={{ marginBottom: '20px', flexShrink: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 700, margin: 0, color: '#111827' }}>{current.title}</h3>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: '#9ca3af', background: '#f9fafb', padding: '4px 8px', borderRadius: '10px', border: '1px solid #f3f4f6' }}>
+              {step + 1} / 3
+            </span>
+          </div>
+          <p style={{ fontSize: '14px', color: '#4b5563', margin: 0, lineHeight: 1.4, whiteSpace: 'pre-line' }}>{current.text}</p>
+        </div>
+
+        {/* Interactive Grid Area */}
+        {(isSetup || isGameplay) && (
+          <div style={{
+            marginBottom: '10px', background: '#f8fafc', padding: '12px',
+            borderRadius: '16px', border: '1px solid #f1f5f9',
+            overflowY: 'auto' // Safety scroll for tiny screens
+          }}>
+            <p style={{ textAlign: 'center', fontSize: '12px', fontWeight: 600, color: canProceed() ? '#10b981' : '#6366f1', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              {canProceed() ? "✅ Excellent! Continue." : current.task}
+            </p>
+
+            {/* THE GRID: Matches main game 4x4 layout exactly */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(4, 1fr)',
+              gap: '6px',
+              width: '100%',
+              aspectRatio: '1' // Keeps it square 
+            }}>
+              {ALL_CELLS.map((c) => {
+                // Determine State
+                const isPlaced = tutorialBottles.includes(c);
+                const isGuessed = tutorialGuesses.includes(c);
+
+                // Visual Logic
+                let bg = '#ffffff';
+                let color = '#1f2937';
+                let content = c;
+                let border = 'none'; // Default no border
+                let animation = 'none';
+                let shadow = '0 2px 4px rgba(0,0,0,0.1)';
+
+                if (isSetup) {
+                  // SETUP PHASE: Show bottles
+                  if (isPlaced) {
+                    bg = '#f59e0b'; content = '🧴'; border = '2px solid #e5e7eb'; animation = 'popIn 0.3s';
+                  } else {
+                    border = '2px solid #e5e7eb';
+                  }
+                } else {
+                  // GAMEPLAY PHASE: Hide bottles, show guesses
+                  if (isGuessed) {
+                    // Check against the REAL placement from Step 1
+                    if (isPlaced) {
+                      bg = '#10b981'; color = '#ffffff'; content = '💥'; animation = 'popIn 0.3s';
+                    } else {
+                      bg = '#e5e7eb'; color = '#6b7280'; content = '⭕';
+                    }
+                  }
+                }
+
+                return (
+                  <button key={c} onClick={() => handleDemoClick(c)} style={{
+                    width: '100%', height: '100%', padding: 0, borderRadius: '10px',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontWeight: 700,
+                    fontSize: (['🧴', '💥', '⭕'].includes(content)) ? 'clamp(16px, 4vw, 20px)' : 'clamp(10px, 3vw, 12px)',
+                    border: border,
+                    cursor: 'pointer', background: bg, color: color,
+                    boxShadow: shadow,
+                    fontFamily: 'inherit',
+                    transition: 'transform 0.1s',
+                    animation: animation,
+                    transform: (isSetup && isPlaced) || (isGameplay && isGuessed) ? 'scale(0.95)' : 'scale(1)'
                   }}>
-                  {isHit ? '💥' : isMiss ? '⭕' : c}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {currentStep.demo === 'result' && (
-        <div style={{ background: '#f3f4f6', padding: '16px', borderRadius: '12px', marginBottom: '16px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', maxWidth: '400px', margin: '0 auto' }}>
-            <div style={{ animation: 'slideInLeft 0.5s' }}>
-              <div style={{ textAlign: 'center', marginBottom: '8px', fontWeight: 600, color: '#10b981', fontSize: '14px' }}>Hit! 💥</div>
-              <div style={{ padding: '30px', background: '#10b981', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', color: '#fff', animation: 'tada 1s' }}>
-                💥
-              </div>
-              <p style={{ textAlign: 'center', fontSize: '12px', color: '#6b7280', marginTop: '8px' }}>Go again!</p>
-            </div>
-            <div style={{ animation: 'slideInRight 0.5s' }}>
-              <div style={{ textAlign: 'center', marginBottom: '8px', fontWeight: 600, color: '#6b7280', fontSize: '14px' }}>Miss ⭕</div>
-              <div style={{ padding: '30px', background: '#e5e7eb', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', animation: 'shake 0.5s' }}>
-                ⭕
-              </div>
-              <p style={{ textAlign: 'center', fontSize: '12px', color: '#6b7280', marginTop: '8px' }}>Turn switches</p>
+                    {content}
+                  </button>
+                );
+              })}
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px' }}>
-        <div style={{ display: 'flex', gap: '6px' }}>
-          {steps.map((_, i) => (
-            <div key={i} style={{ width: '8px', height: '8px', borderRadius: '50%', background: i === step ? currentStep.color : '#e5e7eb', transition: 'all 0.3s' }} />
-          ))}
-        </div>
-
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '10px', marginTop: 'auto' }}>
           {step > 0 && (
-            <button
-              onClick={() => { setStep(step - 1); setDemoBottles([]); setDemoGuessed([]); }}
-              style={{ padding: '8px 16px', borderRadius: '8px', background: '#e5e7eb', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '14px', fontFamily: 'inherit' }}
-            >
-              ← Back
+            <button onClick={() => { setStep(s => s - 1); setTutorialGuesses([]); }} style={{ padding: '12px 16px', borderRadius: '12px', background: '#f3f4f6', border: 'none', cursor: 'pointer', fontWeight: 600, color: '#4b5563', fontFamily: 'inherit' }}>
+              Back
             </button>
           )}
-          {step < steps.length - 1 ? (
-            <button
-              onClick={() => { setStep(step + 1); setDemoBottles([]); setDemoGuessed([]); }}
-              style={{ padding: '8px 20px', borderRadius: '8px', background: currentStep.color, color: 'white', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '14px', fontFamily: 'inherit' }}
-            >
-              Next →
-            </button>
-          ) : (
-            <button
-              onClick={onClose}
-              style={{ padding: '8px 20px', borderRadius: '8px', background: currentStep.color, color: 'white', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '14px', fontFamily: 'inherit' }}
-            >
-              Let's Play! 🎮
-            </button>
-          )}
+          <button
+            onClick={nextStep}
+            disabled={!canProceed()}
+            style={{
+              flex: 1, padding: '14px', borderRadius: '12px', border: 'none',
+              background: canProceed() ? '#4f46e5' : '#e5e7eb',
+              color: canProceed() ? 'white' : '#9ca3af',
+              fontWeight: 700, fontFamily: 'inherit', cursor: canProceed() ? 'pointer' : 'default',
+              transition: 'all 0.2s', fontSize: '15px'
+            }}>
+            {current.action || "Continue"}
+          </button>
         </div>
       </div>
-
       <style>{`
-        @keyframes bounce {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-20px); }
-        }
-        @keyframes plop {
-          0% { transform: scale(0.8); }
-          50% { transform: scale(1.1); }
-          100% { transform: scale(1); }
-        }
-        @keyframes ping {
-          0% { transform: scale(1); opacity: 1; }
-          50% { transform: scale(1.2); opacity: 0.8; }
+        @keyframes popIn {
+          0% { transform: scale(0.5); opacity: 0; }
+          60% { transform: scale(1.1); }
           100% { transform: scale(1); opacity: 1; }
-        }
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.7; }
-        }
-        @keyframes tada {
-          0% { transform: scale(1) rotate(0deg); }
-          10%, 20% { transform: scale(0.9) rotate(-3deg); }
-          30%, 50%, 70%, 90% { transform: scale(1.1) rotate(3deg); }
-          40%, 60%, 80% { transform: scale(1.1) rotate(-3deg); }
-          100% { transform: scale(1) rotate(0deg); }
-        }
-        @keyframes shake {
-          0%, 100% { transform: translateX(0); }
-          10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
-          20%, 40%, 60%, 80% { transform: translateX(5px); }
-        }
-        @keyframes slideInLeft {
-          from { transform: translateX(-50px); opacity: 0; }
-          to { transform: translateX(0); opacity: 1; }
-        }
-        @keyframes slideInRight {
-          from { transform: translateX(50px); opacity: 0; }
-          to { transform: translateX(0); opacity: 1; }
         }
       `}</style>
     </div>
@@ -396,6 +381,18 @@ export default function BottleshipApp() {
       }
     };
     initAuth();
+
+    // NEW: Check for existing session
+    const savedSession = sessionStorage.getItem('bottleship_session');
+    if (savedSession) {
+      const { code, isHost: savedIsHost, name } = JSON.parse(savedSession);
+      setRoomCode(code);
+      setIsHost(savedIsHost);
+      setPlayerName(name);
+      setMode('online');
+      // The snapshot listener will kick in automatically because roomCode is set
+    }
+
     const unsubscribe = onAuthStateChanged(auth, setUser);
     return () => unsubscribe();
   }, []);
@@ -537,6 +534,7 @@ export default function BottleshipApp() {
   }
 
   function resetAll() {
+    sessionStorage.removeItem('bottleship_session'); // NEW: Clear session
     setPlayerBottles([]);
     setOpponentBottles([]);
     setPlayerGrid(ALL_CELLS.map(() => null));
@@ -593,6 +591,14 @@ export default function BottleshipApp() {
     const code = Math.random().toString(36).substring(2, 8).toUpperCase();
     setRoomCode(code);
     setIsHost(true);
+
+    // NEW: Save session
+    sessionStorage.setItem('bottleship_session', JSON.stringify({
+      code,
+      isHost: true,
+      name: playerName || "Player 1"
+    }));
+
     setPlayerName("Host");
 
     const gameRef = doc(db, 'artifacts', appId, 'public', 'data', 'bottleship', code);
@@ -639,6 +645,14 @@ export default function BottleshipApp() {
 
     setRoomCode(code);
     setIsHost(false);
+
+    // NEW: Save session
+    sessionStorage.setItem('bottleship_session', JSON.stringify({
+      code,
+      isHost: false,
+      name: playerName || "Guest"
+    }));
+
     setPlayerName("Guest");
   }
 
@@ -892,39 +906,6 @@ export default function BottleshipApp() {
     setTimeout(() => setShowConfetti(false), 3000);
   }
 
-  function renderGuessCell(cell, index) {
-    const state = mode === "pass" && activePlayer === 1 ? playerGrid[index] :
-      mode === "pass" && activePlayer === 2 ? opponentGrid[index] :
-        playerGrid[index];
-
-    return (
-      <button
-        key={cell}
-        onClick={() => playerGuess(cell)}
-        disabled={winner}
-        style={{
-          width: '100%',
-          aspectRatio: '1',
-          minHeight: '55px',
-          borderRadius: '10px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontWeight: 700,
-          fontSize: state ? '22px' : '15px',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-          transition: 'all 0.2s',
-          border: 'none',
-          cursor: winner ? 'default' : 'pointer',
-          background: state === 'hit' ? '#10b981' : state === 'miss' ? '#e5e7eb' : '#ffffff',
-          color: state === 'hit' ? '#ffffff' : state === 'miss' ? '#6b7280' : '#1f2937',
-          fontFamily: 'system-ui, -apple-system, sans-serif'
-        }}
-      >
-        {state === "hit" ? '💥' : state === "miss" ? '⭕' : cell}
-      </button>
-    );
-  }
 
   const baseStyle = { fontFamily: 'system-ui, -apple-system, sans-serif' };
 
