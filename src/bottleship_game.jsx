@@ -6,6 +6,7 @@ import { getFirestore, doc, setDoc, updateDoc, onSnapshot, getDoc } from "fireba
 import HIT from './assets/HIT.mp3';
 import MISS from './assets/MISS.mp3';
 import WIN from './assets/WIN.mp3';
+import CHAT from './assets/CHAT.mp3';
 
 // --- Firebase Configuration & Initialization ---
 const firebaseConfig = {
@@ -361,11 +362,28 @@ export default function BottleshipApp() {
   const [showOpponentLeft, setShowOpponentLeft] = useState(false);
   const isLeavingRef = useRef(false);
 
+  // --- CHAT / EMOTE STATE ---
+  const [showEmoteMenu, setShowEmoteMenu] = useState(false);
+  const [activeEmote, setActiveEmote] = useState(null); // { text: "...", isMine: true/false }
+  const lastEmoteIdRef = useRef(0); // To track which message we already saw
+  const lastSentTimeRef = useRef(0);
+
+  const EMOTES = [
+    "🚀 Play Fast!",
+    "🎯 Nice Shot!",
+    "😱 Ouch!",
+    "🤔 Thinking...",
+    "😅 Lucky!",
+    "🤝 Good Game!"
+  ];
+
   const sounds = useMemo(() => {
     const h = new Audio(HIT); h.preload = 'auto';
     const m = new Audio(MISS); m.preload = 'auto';
     const w = new Audio(WIN); w.preload = 'auto';
-    return { hit: h, miss: m, win: w };
+    const c = new Audio(CHAT); c.preload = 'auto';
+
+    return { hit: h, miss: m, win: w, chat: c };
   }, []);
 
   const aiRef = useRef(null);
@@ -423,6 +441,23 @@ export default function BottleshipApp() {
 
       const data = snapshot.data();
       setOnlineGameData(data);
+
+      // --- DETECT INCOMING EMOTES ---
+      if (data.lastEmote && data.lastEmote.id !== lastEmoteIdRef.current) {
+        lastEmoteIdRef.current = data.lastEmote.id;
+
+        const sender = data.lastEmote.from;
+        const amIHost = isHost; // Ensure this variable is accessible or use state
+        // logic: if sender is 'host' and I am 'host', it's me.
+        const isMe = (sender === 'host' && amIHost) || (sender === 'guest' && !amIHost);
+
+        if (!isMe) {
+          playSound(sounds.chat);
+          // Play a sound if you want: sounds.pop.play()
+          setActiveEmote({ text: data.lastEmote.content, isMine: false });
+          setTimeout(() => setActiveEmote(null), 3000);
+        }
+      }
 
       // --- DETECT ABANDONMENT ---
       if (data.status === 'abandoned') {
@@ -721,6 +756,46 @@ export default function BottleshipApp() {
     setScreen("guess");
     setMessage(`${player1Name}'s turn`);
   }
+
+  const sendEmote = async (text) => {
+    const now = Date.now();
+    const COOLDOWN_MS = 2000; // 2 seconds cooldown
+
+    // 1. SPAM CHECK: If clicked too soon, do nothing
+    if (now - lastSentTimeRef.current < COOLDOWN_MS) {
+      return;
+    }
+
+    // Update the last sent time
+    lastSentTimeRef.current = now;
+
+    // 2. Close menu and Play Sound immediately
+    setShowEmoteMenu(false);
+
+    // Play sound (using the helper if you added it, or direct logic)
+    if (sounds.chat) {
+      const s = sounds.chat.cloneNode(true);
+      s.volume = 0.6;
+      s.play().catch(() => { });
+    }
+
+    // 3. Show locally immediately (instant feedback)
+    setActiveEmote({ text, isMine: true });
+    setTimeout(() => setActiveEmote(null), 3000);
+
+    // 4. Send to network
+    if (mode === 'online' && roomCode) {
+      const gameRef = doc(db, 'artifacts', appId, 'public', 'data', 'bottleship', roomCode);
+      // Fire and forget (no await needed for UI)
+      updateDoc(gameRef, {
+        lastEmote: {
+          content: text,
+          from: isHost ? 'host' : 'guest',
+          id: now // Use the same timestamp
+        }
+      }).catch(err => console.error("Emote failed:", err));
+    }
+  };
 
   async function playerGuess(cell) {
     if (winner) return;
@@ -1572,6 +1647,96 @@ export default function BottleshipApp() {
                 100% { transform: scale(1); opacity: 1; }
               }
             `}</style>
+
+
+            {/* --- EMOTE UI LAYER --- */}
+            {mode === 'online' && (
+              <>
+                {/* 1. The Active Emote Bubble */}
+                {activeEmote && (
+                  <div style={{
+                    position: 'fixed', // Fixed positioning to float over everything
+                    top: activeEmote.isMine ? 'auto' : '100px', // Opponent: Top Left
+                    bottom: activeEmote.isMine ? '100px' : 'auto', // Mine: Bottom Right (above button)
+                    left: activeEmote.isMine ? 'auto' : '20px',
+                    right: activeEmote.isMine ? '20px' : 'auto',
+                    background: activeEmote.isMine ? '#4f46e5' : '#ffffff',
+                    color: activeEmote.isMine ? '#ffffff' : '#1f2937',
+                    padding: '12px 20px',
+                    borderRadius: '24px',
+                    boxShadow: '0 8px 20px rgba(0,0,0,0.15)',
+                    fontWeight: 700,
+                    fontSize: '16px',
+                    zIndex: 2000, // Ensure it's on top of game board
+                    animation: 'emotePopIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                    border: activeEmote.isMine ? 'none' : '2px solid #e5e7eb',
+                    pointerEvents: 'none', // Click-through so it doesn't block game
+                    maxWidth: '200px',
+                    textAlign: 'center'
+                  }}>
+                    {activeEmote.text}
+                  </div>
+                )}
+
+                {/* 2. The Floating Chat Button */}
+                <button
+                  onClick={() => setShowEmoteMenu(!showEmoteMenu)}
+                  style={{
+                    position: 'fixed', bottom: '20px', right: '20px',
+                    width: '56px', height: '56px', borderRadius: '50%',
+                    background: '#ffffff', border: '2px solid #e5e7eb',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                    fontSize: '24px', cursor: 'pointer', zIndex: 150,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    transition: 'transform 0.1s'
+                  }}
+                  onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.9)'}
+                  onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                >
+                  💬
+                </button>
+
+                {/* 3. The Popup Menu */}
+                {showEmoteMenu && (
+                  <div style={{
+                    position: 'fixed', bottom: '90px', right: '20px',
+                    background: 'white', borderRadius: '16px',
+                    boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+                    padding: '12px', zIndex: 150,
+                    display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px',
+                    animation: 'emoteSlideUp 0.2s ease-out'
+                  }}>
+                    {EMOTES.map((msg) => (
+                      <button
+                        key={msg}
+                        onClick={() => sendEmote(msg)}
+                        style={{
+                          padding: '12px 16px', borderRadius: '8px',
+                          border: '1px solid #f3f4f6', background: '#ffffff',
+                          cursor: 'pointer', fontWeight: 600, fontSize: '14px',
+                          color: '#374151', textAlign: 'left',
+                          transition: 'background 0.1s'
+                        }}
+                      >
+                        {msg}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Animations (Renamed to avoid conflicts) */}
+                <style>{`
+                  @keyframes emotePopIn {
+                    from { transform: scale(0.5); opacity: 0; }
+                    to { transform: scale(1); opacity: 1; }
+                  }
+                  @keyframes emoteSlideUp {
+                    from { opacity: 0; transform: translateY(10px); }
+                    to { opacity: 1; transform: translateY(0); }
+                  }
+                `}</style>
+              </>
+            )}
           </div>
         )}
 
