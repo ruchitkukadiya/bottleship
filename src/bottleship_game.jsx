@@ -156,11 +156,12 @@ function InteractiveTutorial({ onClose, sounds }) {
         // Determine Hit/Miss based on Step 1 placements
         const isHit = tutorialBottles.includes(cell);
 
-        // Play Sound (using cloneNode to allow overlapping sounds)
-        if (isHit) {
-          if (sounds && sounds.hit) sounds.hit.cloneNode(true).play().catch(() => { });
-        } else {
-          if (sounds && sounds.miss) sounds.miss.cloneNode(true).play().catch(() => { });
+        // Play Sound 
+        const audio = isHit ? sounds?.hit : sounds?.miss;
+        if (audio) {
+          const s = audio.cloneNode(true);
+          s.volume = 0.6;
+          s.play().catch(() => { });
         }
 
         setTutorialGuesses(prev => [...prev, cell]);
@@ -202,7 +203,7 @@ function InteractiveTutorial({ onClose, sounds }) {
         padding: '24px', position: 'relative', overflow: 'hidden',
         display: 'flex', flexDirection: 'column', maxHeight: '90vh' // Prevent overflow on small mobiles
       }}>
-<button onClick={onClose} style={{ position: 'absolute', top: '12px', right: '12px', background: '#f3f4f6', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', color: '#6b7280', zIndex: 10 }} aria-label="Close">✕</button>
+        <button onClick={onClose} style={{ position: 'absolute', top: '12px', right: '12px', background: '#f3f4f6', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', color: '#6b7280', zIndex: 10 }} aria-label="Close">✕</button>
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '16px', borderBottom: '1px solid #f3f4f6', paddingBottom: '12px' }}>
           <h2 style={{ fontSize: '20px', fontWeight: 800, margin: '0 0 4px 0', color: '#3730a3' }}>How to Play</h2>
@@ -210,6 +211,8 @@ function InteractiveTutorial({ onClose, sounds }) {
             Shatter the enemy bottles before yours get smashed.
           </p>
         </div>
+
+
 
         {/* Content */}
         <div style={{ marginBottom: '20px', flexShrink: 0 }}>
@@ -359,12 +362,10 @@ export default function BottleshipApp() {
   const isLeavingRef = useRef(false);
 
   const sounds = useMemo(() => {
-    // Disabled audio for now as assets are missing
-    return {
-      hit: new Audio(HIT),
-      miss: new Audio(MISS),
-      win: new Audio(WIN),
-    };
+    const h = new Audio(HIT); h.preload = 'auto';
+    const m = new Audio(MISS); m.preload = 'auto';
+    const w = new Audio(WIN); w.preload = 'auto';
+    return { hit: h, miss: m, win: w };
   }, []);
 
   const aiRef = useRef(null);
@@ -532,6 +533,15 @@ export default function BottleshipApp() {
     resetAll();
     setScreen('menu');
   }
+
+  // Helper for low-latency overlapping audio
+  const playSound = (audioObj) => {
+    if (!audioObj) return;
+    // cloneNode(true) creates a fresh instance allowing rapid-fire playback
+    const sound = audioObj.cloneNode(true);
+    sound.volume = 0.6; // Adjust volume if needed
+    sound.play().catch((e) => console.log("Audio play failed:", e));
+  };
 
   function resetAll() {
     sessionStorage.removeItem('bottleship_session'); // NEW: Clear session
@@ -752,9 +762,9 @@ export default function BottleshipApp() {
       }
 
       if (hit) {
-        if (sounds.hit) sounds.hit.play().catch(() => { });
+        playSound(sounds.hit)
       } else {
-        if (sounds.miss) sounds.miss.play().catch(() => { });
+        playSound(sounds.miss)
       }
 
       await updateDoc(gameRef, updatePayload);
@@ -778,7 +788,7 @@ export default function BottleshipApp() {
         setPlayerGrid(newGrid);
 
         if (hit) {
-          if (sounds.hit) sounds.hit.play().catch(() => { });
+          playSound(sounds.hit);
           setMessage(`Hit! ${player1Name} goes again`);
           const hitsCount = newGrid.filter((c) => c === "hit").length;
           if (hitsCount >= 4) {
@@ -788,7 +798,8 @@ export default function BottleshipApp() {
           return;
         }
 
-        if (sounds.miss) sounds.miss.play().catch(() => { });
+        playSound(sounds.miss);
+
         setActivePlayer(2);
         setMessage(`${player2Name}'s turn`);
 
@@ -805,7 +816,7 @@ export default function BottleshipApp() {
         setOpponentGrid(newGrid);
 
         if (hit) {
-          if (sounds.hit) sounds.hit.play().catch(() => { });
+          playSound(sounds.hit);
           setMessage(`Hit! ${player2Name} goes again`);
           const hitsCount = newGrid.filter((c) => c === "hit").length;
           if (hitsCount >= 4) {
@@ -815,7 +826,7 @@ export default function BottleshipApp() {
           return;
         }
 
-        if (sounds.miss) sounds.miss.play().catch(() => { });
+        playSound(sounds.miss)
         setActivePlayer(1);
         setMessage(`${player1Name}'s turn`);
       }
@@ -840,7 +851,7 @@ export default function BottleshipApp() {
     });
 
     if (hit) {
-      if (sounds.hit) sounds.hit.play().catch(() => { });
+      playSound(sounds.hit);
       setMessage(`Hit! Go again`);
       const hitsCount = playerGrid.filter((c) => c === "hit").length + 1;
       if (hitsCount >= 4) {
@@ -850,7 +861,7 @@ export default function BottleshipApp() {
       return;
     }
 
-    if (sounds.miss) sounds.miss.play().catch(() => { });
+    playSound(sounds.miss);
 
     if (mode === "ai") {
       setCurrentTurn("opponent");
@@ -879,10 +890,10 @@ export default function BottleshipApp() {
     });
     aiRef.current.registerResult(next, wasHit);
     if (wasHit) {
-      if (sounds.hit) sounds.hit.play().catch(() => { });
+      playSound(sounds.hit);
       setTimeout(aiPlay, 500);
     } else {
-      if (sounds.miss) sounds.miss.play().catch(() => { });
+      playSound(sounds.miss);
       setCurrentTurn("player");
       setMessage(`Your turn`);
     }
@@ -891,7 +902,7 @@ export default function BottleshipApp() {
   function finishGame(w) {
     setWinner(w);
     setShowConfetti(true);
-    if (sounds.win) sounds.win.play().catch(() => { });
+    playSound(sounds.win);
 
     if (mode === "pass") {
       setMessage(w === 1 ? `${player1Name} Wins! 🎉` : `${player2Name} Wins! 🎉`);
@@ -975,16 +986,85 @@ export default function BottleshipApp() {
               <button onClick={startPassMode} style={{ padding: '16px', borderRadius: '12px', background: 'linear-gradient(90deg,#34d399,#06b6d4)', color: 'white', border: 'none', cursor: 'pointer', fontSize: '16px', fontWeight: 600, fontFamily: 'inherit' }}>👥 Pass & Play (2P)</button>
               <button onClick={startOnlineMode} style={{ padding: '16px', borderRadius: '12px', background: 'linear-gradient(90deg,#fb923c,#ef4444)', color: 'white', border: 'none', cursor: 'pointer', fontSize: '16px', fontWeight: 600, fontFamily: 'inherit' }}>🌐 Online (Multiplayer)</button>
             </div>
-            <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'center', gap: '12px', flexWrap: 'wrap' }}>
-              <button onClick={() => setScreen('tutorial')} style={{ background: 'transparent', border: 'none', color: '#374151', textDecoration: 'underline', cursor: 'pointer', fontSize: '14px', fontWeight: 600, fontFamily: 'inherit' }}>📖 How to play</button>
-              {/* Feedback Button Replaces Reset */}
-              <button onClick={() => window.location.href = "mailto:your@email.com?subject=Bottleship Feedback"} style={{ background: 'transparent', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: '14px', fontFamily: 'inherit' }}>💌 Feedback</button>
+
+            {/* NEW: Secondary Action Row */}
+            <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid #f3f4f6', display: 'flex', gap: '12px', textAlign: 'center' }}>
+              <button
+                onClick={() => setScreen('tutorial')}
+                style={{
+                  flex: 1, padding: '12px', borderRadius: '12px',
+                  background: '#eff6ff', color: '#3730a3', border: '1px solid #c7d2fe',
+                  cursor: 'pointer', fontSize: '14px', fontWeight: 700, fontFamily: 'inherit',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
+                }}
+              >
+                📺 How to Play
+              </button>
+
+              {/* NEW: Video Link Button */}
+              <a
+                href="https://youtube.com/watch?v=YOUR_VIDEO_ID"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '4px',
+                  fontSize: '12px', fontWeight: 700, color: '#ef4444',
+                  textDecoration: 'none', background: '#fef2f2',
+                  padding: '6px 12px', borderRadius: '20px', border: '1px solid #fee2e2'
+                }}
+              >
+                ▶ Watch How To Play Video
+              </a>
             </div>
-            <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid #e5e7eb', textAlign: 'center' }}>
-              <p style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#6b7280' }}>
-                Original Game by Ruchit Kukadiya
+
+            <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid #f3f4f6', textAlign: 'center' }}>
+              <p style={{ margin: '0 0 10px 0', fontSize: '16px', color: '#6b7280', fontWeight: 500 }}>
+                Built with ❤️ by <span style={{ fontWeight: '700', color: '#870cecff' }}>Ruchit Kukadiya</span>
               </p>
+
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '20px' }}>
+                {/* Instagram */}
+                <a href="https://www.instagram.com/ruchit.kukadiya/" target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '6px', textDecoration: 'none', color: '#6b7280', transition: 'color 0.2s', fontSize: '14px', fontWeight: 600 }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+                    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+                    <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
+                  </svg>
+                  <span>Instagram</span>
+                </a>
+
+                {/* YouTube */}
+                <a href="https://www.youtube.com/c/RuchitKukadiya" target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '6px', textDecoration: 'none', color: '#6b7280', transition: 'color 0.2s', fontSize: '14px', fontWeight: 600 }}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.4 19c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.33 29 29 0 0 0-.46-5.33z"></path>
+                    <polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02"></polygon>
+                  </svg>
+                  <span>YouTube</span>
+                </a>
+
+                {/* LinkedIn */}
+                <a href="https://in.linkedin.com/in/ruchit-kukadiya" target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '6px', textDecoration: 'none', color: '#6b7280', transition: 'color 0.2s', fontSize: '14px', fontWeight: 600 }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path>
+                    <rect x="2" y="9" width="4" height="12"></rect>
+                    <circle cx="4" cy="4" r="2"></circle>
+                  </svg>
+                  <span>LinkedIn</span>
+                </a>
+              </div>
             </div>
+
+            <button
+              onClick={() => window.location.href = "mailto:ruchitkukadiya111@gmail.com?subject=Bottleship Feedback"}
+              style={{
+                padding: '12px', borderRadius: '12px', margin: 'auto', marginTop: '20px',
+                background: '#fff1f2', color: '#be123c', border: '1px solid #fecdd3',
+                cursor: 'pointer', fontSize: '14px', fontWeight: 700, fontFamily: 'inherit',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
+              }}
+            >
+              💌 Feedback
+            </button>
           </div>
         )}
 
@@ -1272,7 +1352,10 @@ export default function BottleshipApp() {
                 </h2>
                 <div style={{ marginTop: 20, display: 'flex', gap: '8px', flexDirection: 'column' }}>
                   <button
-                    onClick={() => mode === 'online' ? leaveOnlineRoom() : resetAll()}
+                    onClick={() => {
+                      if (mode === 'online') leaveOnlineRoom();
+                      else { resetAll(); setScreen('menu'); } // <--- Added setScreen('menu')
+                    }}
                     style={{ padding: '12px', borderRadius: '8px', background: '#4f46e5', color: 'white', border: 'none', cursor: 'pointer', fontSize: '15px', fontWeight: 600, fontFamily: 'inherit' }}
                   >
                     Main Menu
@@ -1473,7 +1556,14 @@ export default function BottleshipApp() {
             </div>
 
             <div style={{ marginTop: '12px', textAlign: 'center' }}>
-              <button onClick={() => mode === 'online' ? leaveOnlineRoom() : resetAll()} style={{ padding: '10px 20px', borderRadius: '8px', background: '#e5e7eb', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: 600, fontFamily: 'inherit' }}>Exit</button>
+              <button
+                onClick={() => {
+                  if (mode === 'online') leaveOnlineRoom();
+                  else { resetAll(); setScreen('menu'); } // <--- Added setScreen('menu')
+                }}
+                style={{ padding: '10px 20px', borderRadius: '8px', background: '#e5e7eb', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: 600, fontFamily: 'inherit' }}>
+                Exit
+              </button>
             </div>
             <style>{`
               @keyframes popIn {
