@@ -377,6 +377,27 @@ export default function BottleshipApp() {
     "🤝 Good Game!"
   ];
 
+  // --- PWA INSTALL LOGIC ---
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      e.preventDefault(); // Prevent Chrome's default mini-infobar
+      setDeferredPrompt(e); // Save the event so we can trigger it later
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt(); // Show the native install popup
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null); // Hide button if installed
+    }
+  };
+
   const sounds = useMemo(() => {
     const h = new Audio(HIT); h.preload = 'auto';
     const m = new Audio(MISS); m.preload = 'auto';
@@ -1064,6 +1085,34 @@ export default function BottleshipApp() {
 
             {/* NEW: Secondary Action Row */}
             <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid #f3f4f6', display: 'flex', gap: '12px', textAlign: 'center' }}>
+
+              {/* NEW: Install App Button (Only visible if installable) */}
+              {deferredPrompt && (
+                <button
+                  onClick={handleInstallClick}
+                  style={{
+                    padding: '14px', borderRadius: '12px',
+                    background: '#1e293b', // Dark/Black stands out as "System" action
+                    color: 'white', border: 'none', cursor: 'pointer',
+                    fontSize: '16px', fontWeight: 700, fontFamily: 'inherit',
+                    boxShadow: '0 4px 10px rgba(0,0,0,0.2)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', flexDirection: 'column',
+                    transition: 'transform 0.2s',
+                    animation: 'pulse-subtle 2s infinite'
+                  }}
+                >
+                  <span style={{ fontSize: '18px' }}>📲</span> Install as App
+                </button>
+              )}
+
+              <style>{`
+                @keyframes pulse-subtle {
+                  0% { box-shadow: 0 0 0 0px rgba(30, 41, 59, 0.2); }
+                  70% { box-shadow: 0 0 0 10px rgba(30, 41, 59, 0); }
+                  100% { box-shadow: 0 0 0 0px rgba(30, 41, 59, 0); }
+                }
+              `}</style>
+
               <button
                 onClick={() => setScreen('tutorial')}
                 style={{
@@ -1073,7 +1122,7 @@ export default function BottleshipApp() {
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
                 }}
               >
-                📺 How to Play
+                📺 <br /> How to Play
               </button>
 
               {/* NEW: Video Link Button */}
@@ -1088,7 +1137,7 @@ export default function BottleshipApp() {
                   padding: '6px 12px', borderRadius: '20px', border: '1px solid #fee2e2'
                 }}
               >
-                ▶ Watch How To Play Video
+                ▶ <br />  Watch  <br /> "How To Play" Video
               </a>
             </div>
 
