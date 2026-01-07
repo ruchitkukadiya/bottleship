@@ -75,6 +75,27 @@ function useRefinedAI() {
   return { reset, nextMove, registerResult };
 }
 
+// --- Environment Indicator Component ---
+function EnvironmentBadge() {
+  // Read the environment variable (Default to 'beta' if missing)
+  const stage = import.meta.env.VITE_APP_STAGE || 'beta';
+
+  if (stage === 'dev') {
+    return (
+      <div style={{
+        position: 'fixed', top: 0, left: 0, width: '100%',
+        background: '#f59e0b', color: '#000',
+        fontSize: '11px', fontWeight: '800', textAlign: 'center',
+        padding: '2px 0', zIndex: 9999, letterSpacing: '1px'
+      }}>
+        🚧 DEVELOPMENT ENVIRONMENT
+      </div>
+    );
+  }
+
+  return null; // For beta, we handle it in the main title
+}
+
 // --- Visual Components ---
 function Confetti() {
   const pieces = Array.from({ length: 50 }, (_, i) => ({
@@ -1051,6 +1072,7 @@ export default function BottleshipApp() {
 
   return (
     <div style={{ ...baseStyle, minHeight: '100vh', padding: '12px', background: 'linear-gradient(135deg,#eef2ff,#fff7ed)' }}>
+      <EnvironmentBadge />
       {showConfetti && <Confetti />}
 
       <div style={{ width: '100%', maxWidth: '800px', margin: '0 auto' }}>
