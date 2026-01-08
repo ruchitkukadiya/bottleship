@@ -2,6 +2,7 @@ import { useMemo, useRef, useState, useEffect } from "react";
 import { initializeApp } from "firebase/app";
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "firebase/auth";
 import { getFirestore, doc, setDoc, updateDoc, onSnapshot, getDoc } from "firebase/firestore";
+import { getAnalytics, logEvent } from "firebase/analytics";
 
 import HIT from './assets/HIT.mp3';
 import MISS from './assets/MISS.mp3';
@@ -22,6 +23,17 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+let analytics = null;
+try {
+  analytics = getAnalytics(app);
+} catch (e) {
+  console.warn("Analytics failed to load (likely ad blocker):", e);
+}
+const logGameEvent = (eventName, params) => {
+  if (analytics) {
+    logEvent(analytics, eventName, params);
+  }
+};
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
 // --- Game Constants & Helpers ---
@@ -412,6 +424,10 @@ export default function BottleshipApp() {
 
   const handleInstallClick = async () => {
     if (!deferredPrompt) return;
+    logGameEvent(analytics, 'select_content', {
+      content_type: 'button',
+      item_id: 'pwa_install'
+    });
     deferredPrompt.prompt(); // Show the native install popup
     const { outcome } = await deferredPrompt.userChoice;
     if (outcome === 'accepted') {
@@ -442,6 +458,9 @@ export default function BottleshipApp() {
       }
     };
     initAuth();
+
+    // TRACKING: Log that the app was opened
+    logGameEvent(analytics, 'page_view', { page_title: 'Bottleship Menu' });
 
     // NEW: Check for existing session
     const savedSession = sessionStorage.getItem('bottleship_session');
@@ -656,18 +675,30 @@ export default function BottleshipApp() {
   }
 
   function startAIMode() {
+    logGameEvent(analytics, 'select_content', {
+      content_type: 'game_mode',
+      item_id: 'vs_ai'
+    });
     resetAll();
     setMode("ai");
     setScreen("name-input-ai");
   }
 
   function startPassMode() {
+    logGameEvent(analytics, 'select_content', {
+      content_type: 'game_mode',
+      item_id: 'pass_play'
+    });
     resetAll();
     setMode("pass");
     setScreen("name-input-pass");
   }
 
   function startOnlineMode() {
+    logGameEvent(analytics, 'select_content', {
+      content_type: 'game_mode',
+      item_id: 'online_multiplayer'
+    });
     resetAll();
     setMode("online");
     setScreen("name-input-online");
@@ -758,6 +789,10 @@ export default function BottleshipApp() {
       return;
     }
 
+    logGameEvent(analytics, 'level_start', {
+      level_name: mode // 'ai', 'pass', 'online'
+    });
+
     if (mode === "online") {
       const gameRef = doc(db, 'artifacts', appId, 'public', 'data', 'bottleship', roomCode);
       const updateData = isHost ? { hostBottles: playerBottles } : { guestBottles: playerBottles };
@@ -791,6 +826,9 @@ export default function BottleshipApp() {
       alert(`Place 4 bottles`);
       return;
     }
+    logGameEvent(analytics, 'level_start', {
+      level_name: mode // 'ai', 'pass', 'online'
+    });
     setOpponentBottles(tempSecondBottles);
     setTempSecondBottles([]);
     setActivePlayer(1);
@@ -1031,6 +1069,11 @@ export default function BottleshipApp() {
       setMessage(w === "player" ? `${playerName} Wins! 🎉` : "AI Wins!");
     }
 
+    logGameEvent(analytics, 'level_end', {
+      level_name: mode,
+      success: w === 'player' || w === 1 ? true : false
+    });
+
     setTimeout(() => setShowConfetti(false), 3000);
   }
 
@@ -1071,7 +1114,7 @@ export default function BottleshipApp() {
   };
 
   return (
-    <div style={{ ...baseStyle, minHeight: '100vh', padding: '12px', background: 'linear-gradient(135deg,#eef2ff,#fff7ed)' }}>
+    <div style={{ ...baseStyle, minHeight: '100vh', padding: '12px', overscrollBehavior: 'none', background: 'linear-gradient(135deg,#eef2ff,#fff7ed)' }}>
       <EnvironmentBadge />
       {showConfetti && <Confetti />}
 
