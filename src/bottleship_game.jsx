@@ -41,6 +41,12 @@ const COLS = ["A", "B", "C", "D"];
 const ROWS = [1, 2, 3, 4];
 const ALL_CELLS = COLS.flatMap((c) => ROWS.map((r) => `${c}${r}`));
 
+// Check if it's Republic Day (January 26, 2026)
+const isRepublicDay = () => {
+  const today = new Date();
+  return today.getMonth() === 0 && today.getDate() === 26 && today.getFullYear() === 2026;
+};
+
 const idx = (cell) => ALL_CELLS.indexOf(cell);
 const safeRandChoice = (arr) => {
   if (!Array.isArray(arr) || arr.length === 0) return null;
@@ -1139,13 +1145,35 @@ export default function BottleshipApp() {
           </span>
         </h1>
 
+        {isRepublicDay() && (
+          <div style={{
+            background: 'linear-gradient(135deg, #ff9933, #ffffff, #138808)',
+            padding: '16px',
+            borderRadius: '12px',
+            marginBottom: '20px',
+            textAlign: 'center',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            border: '2px solid #ff9933'
+          }}>
+            <h2 style={{
+              fontSize: 'clamp(20px, 5vw, 28px)',
+              fontWeight: 900,
+              margin: '0',
+              color: '#000080',
+              textShadow: '1px 1px 2px rgba(255,255,255,0.8)'
+            }}>
+              Happy Republic Day!
+            </h2>
+          </div>
+        )}
+
         {screen === 'menu' && (
           <div style={{ background: 'rgba(255,255,255,0.95)', padding: '20px', borderRadius: '16px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
             <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '16px', textAlign: 'center' }}>Choose Your Mode</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <button onClick={startAIMode} style={{ padding: '16px', borderRadius: '12px', background: 'linear-gradient(90deg,#6366f1,#8b5cf6)', color: 'white', border: 'none', cursor: 'pointer', fontSize: '16px', fontWeight: 600, fontFamily: 'inherit' }}>🤖 Play vs AI</button>
-              <button onClick={startPassMode} style={{ padding: '16px', borderRadius: '12px', background: 'linear-gradient(90deg,#34d399,#06b6d4)', color: 'white', border: 'none', cursor: 'pointer', fontSize: '16px', fontWeight: 600, fontFamily: 'inherit' }}>👥 Pass & Play (2P)</button>
-              <button onClick={startOnlineMode} style={{ padding: '16px', borderRadius: '12px', background: 'linear-gradient(90deg,#fb923c,#ef4444)', color: 'white', border: 'none', cursor: 'pointer', fontSize: '16px', fontWeight: 600, fontFamily: 'inherit' }}>🌐 Online (Multiplayer)</button>
+              <button onClick={startPassMode} style={{ padding: '16px', borderRadius: '12px', background: 'linear-gradient(90deg,#34d399,#06b6d4)', color: 'white', border: 'none', cursor: 'pointer', fontSize: '16px', fontWeight: 600, fontFamily: 'inherit' }}>👥 Pass & Play</button>
+              <button onClick={startOnlineMode} style={{ padding: '16px', borderRadius: '12px', background: 'linear-gradient(90deg,#fb923c,#ef4444)', color: 'white', border: 'none', cursor: 'pointer', fontSize: '16px', fontWeight: 600, fontFamily: 'inherit' }}>🌐 Online</button>
             </div>
 
             {/* NEW: Secondary Action Row */}
@@ -1208,7 +1236,15 @@ export default function BottleshipApp() {
 
             <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid #f3f4f6', textAlign: 'center' }}>
               <p style={{ margin: '0 0 10px 0', fontSize: '16px', color: '#6b7280', fontWeight: 500 }}>
-                Built with ❤️ by <span style={{ fontWeight: '700', color: '#870cecff' }}>Ruchit Kukadiya</span>
+                {isRepublicDay() ? (
+                  <>
+                    Made in India by <span style={{ fontWeight: '700', color: '#870cecff' }}>Ruchit Kukadiya</span> ❤️
+                  </>
+                ) : (
+                  <>
+                    Built with ❤️ by <span style={{ fontWeight: '700', color: '#870cecff' }}>Ruchit Kukadiya</span>
+                  </>
+                )}
               </p>
 
               <div style={{ display: 'flex', justifyContent: 'center', gap: '20px' }}>
