@@ -1220,7 +1220,7 @@ export default function BottleshipApp() {
 
               {/* NEW: Video Link Button */}
               <a
-                href="https://youtube.com/watch?v=YOUR_VIDEO_ID"
+                href="https://youtu.be/p3NcXN3hQm0"
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{
